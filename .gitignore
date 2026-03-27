@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.sqlite
 .mcpregistry_github_token
+mcp-publisher.exe
