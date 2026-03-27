@@ -67,7 +67,7 @@ const server = new McpServer({
 // ─── Tool 1: search_curriculum ──────────────────────────────────
 
 server.registerTool(
-  "bc_search_curriculum",
+  "search_curriculum",
   {
     title: "Search BC Curriculum",
     description: `Search BC curriculum (K-12) for standards, competencies, content items, and assessment resources using full-text search. Returns structured results with source metadata.
@@ -94,7 +94,7 @@ Returns: Matching curriculum elements with source type, course, subject, and gra
 // ─── Tool 2: get_course_curriculum ──────────────────────────────
 
 server.registerTool(
-  "bc_get_course_curriculum",
+  "get_course_curriculum",
   {
     title: "Get Course Curriculum",
     description: `Get the complete BC curriculum for a specific course: Big Ideas, Curricular Competencies (grouped by domain), and Content/KDU items with elaborations. Returns the full three-column structure used by BC Ministry of Education.
@@ -119,7 +119,7 @@ Returns: Complete three-column curriculum structure per course, including elabor
 // ─── Tool 3: get_grade_progression ──────────────────────────────
 
 server.registerTool(
-  "bc_get_grade_progression",
+  "get_grade_progression",
   {
     title: "Get Grade Progression",
     description: `Show how Big Ideas, Competencies, and Content progress across grade levels for a BC subject. Useful for understanding scaffolding, prerequisites, and learning trajectories. When a query is provided, filters to only matching items at each grade — showing a focused vertical thread rather than a full data dump.
@@ -146,7 +146,7 @@ Returns: Grade-by-grade breakdown of curriculum elements showing progression, op
 // ─── Tool 4: get_competency_connections ─────────────────────────
 
 server.registerTool(
-  "bc_get_competency_connections",
+  "get_competency_connections",
   {
     title: "Get Competency Connections",
     description: `Find curricular competencies that appear across multiple subjects or courses. Useful for interdisciplinary curriculum design and identifying transferable skills.
@@ -170,7 +170,7 @@ Returns: Related competencies from other courses/subjects with similarity rankin
 // ─── Tool 5: get_core_competencies ──────────────────────────────
 
 server.registerTool(
-  "bc_get_core_competencies",
+  "get_core_competencies",
   {
     title: "Get Core Competencies",
     description: `Get BC Core Competencies (Communication, Thinking, Personal/Social) with proficiency profiles. These cross-cutting competencies are assessed across all subjects.
@@ -193,7 +193,7 @@ Returns: Core competencies with descriptions and proficiency profile levels.`,
 // ─── Tool 6: get_assessment_resources ───────────────────────────
 
 server.registerTool(
-  "bc_get_assessment_resources",
+  "get_assessment_resources",
   {
     title: "Get Assessment Resources",
     description: `Get BC assessment practices, classroom assessment resources, and reporting guidance.
@@ -218,7 +218,7 @@ Returns: Assessment resources with content and type metadata.`,
 // ─── Tool 7: get_fppl ──────────────────────────────────────────
 
 server.registerTool(
-  "bc_get_fppl",
+  "get_fppl",
   {
     title: "Get First Peoples Principles of Learning",
     description: `Get the First Peoples Principles of Learning (FPPL) with descriptions and connections to curriculum areas. BC curriculum requires authentic integration of these principles.
@@ -241,7 +241,7 @@ Returns: FPPL principles with descriptions and subject-specific connections.`,
 // ─── Tool 8: list_courses ──────────────────────────────────────
 
 server.registerTool(
-  "bc_list_courses",
+  "list_courses",
   {
     title: "List BC Courses",
     description: `List all available courses in the BC curriculum database (K-12). Use this to discover what courses are available before querying specific curriculum data.
@@ -265,7 +265,7 @@ Returns: List of courses with subject, grade, name, and URL.`,
 // ─── Tool 9: get_crawl_status ──────────────────────────────────
 
 server.registerTool(
-  "bc_get_crawl_status",
+  "get_crawl_status",
   {
     title: "Get Crawl Status",
     description: `Check when BC curriculum data was last crawled, data completeness, and any crawl errors. Use to verify data freshness before relying on results.
@@ -288,7 +288,7 @@ Returns: Crawl timestamps, record counts per subject, and recent errors.`,
 // ─── Tool 10: search_cross_curricular ────────────────────────────
 
 server.registerTool(
-  "bc_search_cross_curricular",
+  "search_cross_curricular",
   {
     title: "Search Cross-Curricular Connections",
     description: `Find curriculum elements shared between two or more subjects at the same grade level. Identifies overlapping competencies, big ideas, and content across subjects. Essential for interdisciplinary planning.
@@ -315,7 +315,7 @@ Returns: Groups of curriculum items connected by shared language across subjects
 // ─── Tool 11: get_curriculum_changes ─────────────────────────────
 
 server.registerTool(
-  "bc_get_curriculum_changes",
+  "get_curriculum_changes",
   {
     title: "Get Curriculum Changes",
     description: `Show what changed in BC curriculum since a given date. Detects added, removed, and modified Big Ideas, Competencies, and Content items across crawl runs. Requires at least two crawls to have change data.
@@ -342,7 +342,7 @@ Returns: Course-level summary of which courses changed, plus item-level detail o
 // ─── Tool 12: get_course_history ─────────────────────────────────
 
 server.registerTool(
-  "bc_get_course_history",
+  "get_course_history",
   {
     title: "Get Course History",
     description: `Show the crawl history and change timeline for a specific course. Includes each crawl snapshot (date, item counts, content hash) and a changelog of all detected modifications.
@@ -563,55 +563,55 @@ async function runHTTP(): Promise<void> {
       },
       tools: [
         {
-          name: "bc_search_curriculum",
+          name: "search_curriculum",
           description: "Full-text search across all curriculum data",
         },
         {
-          name: "bc_get_course_curriculum",
+          name: "get_course_curriculum",
           description:
             "Get Big Ideas, Competencies, and Content for a specific course",
         },
         {
-          name: "bc_list_courses",
+          name: "list_courses",
           description: "List all available courses (filter by subject/grade)",
         },
         {
-          name: "bc_get_grade_progression",
+          name: "get_grade_progression",
           description:
             "Trace how curriculum builds across grade levels, optionally focused on a specific concept",
         },
         {
-          name: "bc_get_competency_connections",
+          name: "get_competency_connections",
           description: "Find competencies shared across subjects",
         },
         {
-          name: "bc_get_core_competencies",
+          name: "get_core_competencies",
           description:
             "Get Communication, Thinking, Personal/Social competencies",
         },
         {
-          name: "bc_get_fppl",
+          name: "get_fppl",
           description: "Get First Peoples Principles of Learning",
         },
         {
-          name: "bc_get_assessment_resources",
+          name: "get_assessment_resources",
           description: "Get assessment practices and guidance",
         },
         {
-          name: "bc_get_crawl_status",
+          name: "get_crawl_status",
           description: "Check data freshness and completeness",
         },
         {
-          name: "bc_search_cross_curricular",
+          name: "search_cross_curricular",
           description:
             "Find curriculum connections shared between two or more subjects at a grade",
         },
         {
-          name: "bc_get_curriculum_changes",
+          name: "get_curriculum_changes",
           description: "Show what changed in curriculum since a given date",
         },
         {
-          name: "bc_get_course_history",
+          name: "get_course_history",
           description: "View crawl history and change timeline for a course",
         },
       ],
