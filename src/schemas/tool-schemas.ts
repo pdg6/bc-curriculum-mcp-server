@@ -84,7 +84,11 @@ export const GetGradeProgressionSchema = z
       .optional()
       .describe("Optional: focus the progression on a specific concept (e.g., 'evidence', 'multiplication'). When provided, only items matching this query are shown at each grade."),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.grade_from <= data.grade_to, {
+    message: "grade_from must be less than or equal to grade_to",
+    path: ["grade_from"],
+  });
 
 export type GetGradeProgressionInput = z.infer<
   typeof GetGradeProgressionSchema
@@ -108,46 +112,6 @@ export type GetCompetencyConnectionsInput = z.infer<
   typeof GetCompetencyConnectionsSchema
 >;
 
-export const GetCoreCompetenciesSchema = z
-  .object({
-    domain: z
-      .enum(["communication", "thinking", "personal_social", "all"])
-      .default("all")
-      .optional()
-      .describe("Core competency domain to retrieve"),
-  })
-  .strict();
-
-export type GetCoreCompetenciesInput = z.infer<
-  typeof GetCoreCompetenciesSchema
->;
-
-export const GetAssessmentResourcesSchema = z
-  .object({
-    subject: SubjectEnum.optional(),
-    grade: GradeSchema.optional(),
-    resource_type: z
-      .enum(["classroom-assessment", "reporting", "standards-based", "all"])
-      .default("all")
-      .optional()
-      .describe("Type of assessment resource"),
-  })
-  .strict();
-
-export type GetAssessmentResourcesInput = z.infer<
-  typeof GetAssessmentResourcesSchema
->;
-
-export const GetFpplSchema = z
-  .object({
-    subject: SubjectEnum.optional().describe(
-      "Optional: filter connections to a specific subject"
-    ),
-  })
-  .strict();
-
-export type GetFpplInput = z.infer<typeof GetFpplSchema>;
-
 export const ListCoursesSchema = z
   .object({
     subject: SubjectEnum.optional(),
@@ -157,17 +121,7 @@ export const ListCoursesSchema = z
 
 export type ListCoursesInput = z.infer<typeof ListCoursesSchema>;
 
-export const GetCrawlStatusSchema = z
-  .object({
-    subject: SubjectEnum.optional().describe(
-      "Optional: check specific subject"
-    ),
-  })
-  .strict();
-
-export type GetCrawlStatusInput = z.infer<typeof GetCrawlStatusSchema>;
-
-// ─── New Tool Schemas ─────────────────────────────────────────────
+// ─── Cross-Curricular & Change Tracking ─────────────────────────
 
 export const SearchCrossCurricularSchema = z
   .object({
@@ -204,6 +158,8 @@ export const GetCurriculumChangesSchema = z
   .object({
     since: z
       .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Must be an ISO date string (YYYY-MM-DD)")
+      .refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date" })
       .optional()
       .describe("ISO date string — show changes detected after this date (e.g., '2026-01-15'). Defaults to last 30 days."),
     subject: SubjectEnum.optional(),

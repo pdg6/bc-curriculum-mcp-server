@@ -3,7 +3,7 @@
  * BC Curriculum MCP Server
  *
  * Provides structured access to BC Ministry of Education curriculum data
- * (curriculum.gov.bc.ca) via 12 MCP tools. Data is pre-crawled locally
+ * (curriculum.gov.bc.ca) via 8 MCP tools. Data is pre-crawled locally
  * and stored in a SQLite database for fast, reliable access.
  *
  * Supports both stdio (local) and streamable HTTP (remote) transports.
@@ -23,12 +23,6 @@ import { dirname, join } from "node:path";
 import { listCourses, getCourseCurriculum } from "./tools/curriculum-tools.js";
 import { searchCurriculum } from "./tools/search-tools.js";
 import { getGradeProgression, getCompetencyConnections } from "./tools/progression-tools.js";
-import {
-  getCoreCompetencies,
-  getFppl,
-  getAssessmentResources,
-  getCrawlStatus,
-} from "./tools/reference-tools.js";
 import { searchCrossCurricular } from "./tools/cross-curricular-tools.js";
 import { getCurriculumChanges, getCourseHistory } from "./tools/changelog-tools.js";
 
@@ -38,17 +32,13 @@ import {
   GetCourseCurriculumSchema,
   GetGradeProgressionSchema,
   GetCompetencyConnectionsSchema,
-  GetCoreCompetenciesSchema,
-  GetAssessmentResourcesSchema,
-  GetFpplSchema,
   ListCoursesSchema,
-  GetCrawlStatusSchema,
   SearchCrossCurricularSchema,
   GetCurriculumChangesSchema,
   GetCourseHistorySchema,
 } from "./schemas/tool-schemas.js";
 
-import { closeDb } from "./services/database.js";
+import { closeDb, getDb } from "./services/database.js";
 
 // ─── Version (single source of truth: package.json) ────────────
 
@@ -167,78 +157,7 @@ Returns: Related competencies from other courses/subjects with similarity rankin
   async (params) => getCompetencyConnections(params)
 );
 
-// ─── Tool 5: get_core_competencies ──────────────────────────────
-
-server.registerTool(
-  "get_core_competencies",
-  {
-    title: "Get Core Competencies",
-    description: `Get BC Core Competencies (Communication, Thinking, Personal/Social) with proficiency profiles. These cross-cutting competencies are assessed across all subjects.
-
-Args:
-  - domain (string, optional): Filter by domain ('communication', 'thinking', 'personal_social', 'all'). Default 'all'.
-
-Returns: Core competencies with descriptions and proficiency profile levels.`,
-    inputSchema: GetCoreCompetenciesSchema,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  async (params) => getCoreCompetencies(params)
-);
-
-// ─── Tool 6: get_assessment_resources ───────────────────────────
-
-server.registerTool(
-  "get_assessment_resources",
-  {
-    title: "Get Assessment Resources",
-    description: `Get BC assessment practices, classroom assessment resources, and reporting guidance.
-
-Args:
-  - subject (string, optional): Filter by subject slug
-  - grade (integer, optional): Filter by grade level
-  - resource_type (string, optional): Filter by type ('classroom-assessment', 'reporting', 'standards-based', 'all'). Default 'all'.
-
-Returns: Assessment resources with content and type metadata.`,
-    inputSchema: GetAssessmentResourcesSchema,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  async (params) => getAssessmentResources(params)
-);
-
-// ─── Tool 7: get_fppl ──────────────────────────────────────────
-
-server.registerTool(
-  "get_fppl",
-  {
-    title: "Get First Peoples Principles of Learning",
-    description: `Get the First Peoples Principles of Learning (FPPL) with descriptions and connections to curriculum areas. BC curriculum requires authentic integration of these principles.
-
-Args:
-  - subject (string, optional): Filter connections to a specific subject
-
-Returns: FPPL principles with descriptions and subject-specific connections.`,
-    inputSchema: GetFpplSchema,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  async (params) => getFppl(params)
-);
-
-// ─── Tool 8: list_courses ──────────────────────────────────────
+// ─── Tool 5: list_courses ──────────────────────────────────────
 
 server.registerTool(
   "list_courses",
@@ -262,30 +181,7 @@ Returns: List of courses with subject, grade, name, and URL.`,
   async (params) => listCourses(params)
 );
 
-// ─── Tool 9: get_crawl_status ──────────────────────────────────
-
-server.registerTool(
-  "get_crawl_status",
-  {
-    title: "Get Crawl Status",
-    description: `Check when BC curriculum data was last crawled, data completeness, and any crawl errors. Use to verify data freshness before relying on results.
-
-Args:
-  - subject (string, optional): Check specific subject only
-
-Returns: Crawl timestamps, record counts per subject, and recent errors.`,
-    inputSchema: GetCrawlStatusSchema,
-    annotations: {
-      readOnlyHint: true,
-      destructiveHint: false,
-      idempotentHint: true,
-      openWorldHint: false,
-    },
-  },
-  async (params) => getCrawlStatus(params)
-);
-
-// ─── Tool 10: search_cross_curricular ────────────────────────────
+// ─── Tool 6: search_cross_curricular ───────────────────────────
 
 server.registerTool(
   "search_cross_curricular",
@@ -312,7 +208,7 @@ Returns: Groups of curriculum items connected by shared language across subjects
   async (params) => searchCrossCurricular(params)
 );
 
-// ─── Tool 11: get_curriculum_changes ─────────────────────────────
+// ─── Tool 7: get_curriculum_changes ─────────────────────────────
 
 server.registerTool(
   "get_curriculum_changes",
@@ -339,7 +235,7 @@ Returns: Course-level summary of which courses changed, plus item-level detail o
   async (params) => getCurriculumChanges(params)
 );
 
-// ─── Tool 12: get_course_history ─────────────────────────────────
+// ─── Tool 8: get_course_history ──────────────────────────────────
 
 server.registerTool(
   "get_course_history",
@@ -406,7 +302,7 @@ async function runHTTP(): Promise<void> {
         rateLimitMap.delete(key);
       }
     }
-  }, 5 * 60_000);
+  }, 60_000);
 
   function rateLimitMiddleware(
     req: Request,
@@ -519,11 +415,23 @@ async function runHTTP(): Promise<void> {
 
   // ─── Health check ─────────────────────────────────────────
   app.get("/health", (_req: Request, res: Response) => {
-    res.json({
-      status: "ok",
-      server: "bc-curriculum-mcp-server",
-      version: VERSION,
-    });
+    try {
+      const db = getDb();
+      const row = db.prepare("SELECT COUNT(*) as count FROM courses").get() as { count: number };
+      res.json({
+        status: "ok",
+        server: "bc-curriculum-mcp-server",
+        version: VERSION,
+        courses: row.count,
+      });
+    } catch (err) {
+      res.status(503).json({
+        status: "error",
+        server: "bc-curriculum-mcp-server",
+        version: VERSION,
+        error: "Database unavailable",
+      });
+    }
   });
 
   // ─── Documentation endpoint ───────────────────────────────
@@ -555,10 +463,6 @@ async function runHTTP(): Promise<void> {
           "Curricular Competencies (with domains)",
           "Content / KDU items",
           "Elaborations",
-          "Core Competencies",
-          "First Peoples Principles of Learning",
-          "Assessment Resources",
-          "Instructional Samples",
         ],
       },
       tools: [
@@ -583,23 +487,6 @@ async function runHTTP(): Promise<void> {
         {
           name: "get_competency_connections",
           description: "Find competencies shared across subjects",
-        },
-        {
-          name: "get_core_competencies",
-          description:
-            "Get Communication, Thinking, Personal/Social competencies",
-        },
-        {
-          name: "get_fppl",
-          description: "Get First Peoples Principles of Learning",
-        },
-        {
-          name: "get_assessment_resources",
-          description: "Get assessment practices and guidance",
-        },
-        {
-          name: "get_crawl_status",
-          description: "Check data freshness and completeness",
         },
         {
           name: "search_cross_curricular",
@@ -631,7 +518,6 @@ async function runHTTP(): Promise<void> {
         "What are the Big Ideas for ADST grade 10?",
         "Show me how science competencies build from grade 3 to 7",
         "Find curriculum connections between math and ADST for grade 9",
-        "What are the First Peoples Principles of Learning?",
         "What are the curricular competencies for Kindergarten math?",
       ],
     });
