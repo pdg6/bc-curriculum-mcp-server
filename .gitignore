@@ -14,6 +14,20 @@ crawl-*.log
 .mcpregistry_*
 mcp-publisher.exe
 
+# Test files (kept locally, not in public repo)
+src/**/*.test.ts
+src/test/
+vitest.config.ts
+
+# Deployment configs (kept locally, not in public repo)
+Dockerfile
+.dockerignore
+fly.toml
+DEPLOY.md
+
+# Dev scripts (kept locally, not in public repo)
+scripts/
+
 # OS/editor junk
 .fuse_hidden*
 .DS_Store
