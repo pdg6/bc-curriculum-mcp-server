@@ -52,19 +52,17 @@ export function searchCurriculum(params: SearchCurriculumInput): {
   sql += " ORDER BY rank LIMIT ?";
   bindings.push(params.limit ?? 10);
 
-  let results: FtsRow[];
+  let results: FtsRow[] = [];
   try {
     results = db.prepare(sql).all(...bindings) as FtsRow[];
-  } catch {
+  } catch (err) {
     // If the quoted query fails, try without quotes (individual terms)
-    const fallbackSql = sql.replace("MATCH ?", "MATCH ?");
-    const fallbackBindings = [...bindings];
-    fallbackBindings[0] = params.query
+    const fallbackTerms = params.query
       .split(/\s+/)
       .filter((w) => w.length > 1)
       .join(" OR ");
 
-    if (!fallbackBindings[0]) {
+    if (!fallbackTerms) {
       return {
         content: [
           {
@@ -76,9 +74,13 @@ export function searchCurriculum(params: SearchCurriculumInput): {
       };
     }
 
+    const fallbackBindings = [...bindings];
+    fallbackBindings[0] = fallbackTerms;
+
     try {
-      results = db.prepare(fallbackSql).all(...fallbackBindings) as FtsRow[];
-    } catch {
+      results = db.prepare(sql).all(...fallbackBindings) as FtsRow[];
+    } catch (fallbackErr) {
+      console.error(`FTS search failed for "${params.query}":`, err, fallbackErr);
       return {
         content: [
           {
@@ -105,8 +107,8 @@ export function searchCurriculum(params: SearchCurriculumInput): {
 
       try {
         results = db.prepare(looseSql).all(...looseBindings) as FtsRow[];
-      } catch {
-        // Give up
+      } catch (looseErr) {
+        console.error(`FTS loose search failed for "${params.query}":`, looseErr);
       }
     }
 

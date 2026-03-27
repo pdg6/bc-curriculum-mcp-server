@@ -14,8 +14,10 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import express from "express";
+import type { Request, Response, NextFunction } from "express";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 // Tool implementations
 import { listCourses, getCourseCurriculum } from "./tools/curriculum-tools.js";
@@ -48,11 +50,18 @@ import {
 
 import { closeDb } from "./services/database.js";
 
+// ─── Version (single source of truth: package.json) ────────────
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const VERSION = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8")
+).version as string;
+
 // ─── Server Setup ───────────────────────────────────────────────
 
 const server = new McpServer({
   name: "bc-curriculum-mcp-server",
-  version: "1.1.0",
+  version: VERSION,
 });
 
 // ─── Tool 1: search_curriculum ──────────────────────────────────
@@ -355,64 +364,6 @@ Returns: Timeline of crawl snapshots and detected changes per course.`,
   async (params) => getCourseHistory(params)
 );
 
-// ─── Rate Limiter ───────────────────────────────────────────────
-
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 60;
-
-interface RateLimitEntry {
-  count: number;
-  resetAt: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitEntry>();
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
-}, 5 * 60_000);
-
-function rateLimitMiddleware(
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction
-): void {
-  const ip = req.ip || req.socket.remoteAddress || "unknown";
-  const now = Date.now();
-
-  let entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
-    rateLimitMap.set(ip, entry);
-  }
-
-  entry.count++;
-
-  res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT_MAX));
-  res.setHeader(
-    "X-RateLimit-Remaining",
-    String(Math.max(0, RATE_LIMIT_MAX - entry.count))
-  );
-  res.setHeader(
-    "X-RateLimit-Reset",
-    String(Math.ceil(entry.resetAt / 1000))
-  );
-
-  if (entry.count > RATE_LIMIT_MAX) {
-    res.status(429).json({
-      error: "Rate limit exceeded. Please wait before making more requests.",
-      retry_after_seconds: Math.ceil((entry.resetAt - now) / 1000),
-    });
-    return;
-  }
-
-  next();
-}
-
 // ─── Transport Setup ────────────────────────────────────────────
 
 async function runStdio(): Promise<void> {
@@ -422,23 +373,94 @@ async function runStdio(): Promise<void> {
 }
 
 async function runHTTP(): Promise<void> {
+  // Dynamic imports — express and StreamableHTTPServerTransport are only
+  // loaded when HTTP mode is used, avoiding ~2MB overhead for stdio users.
+  const [{ default: express }, { StreamableHTTPServerTransport }] =
+    await Promise.all([
+      import("express"),
+      import("@modelcontextprotocol/sdk/server/streamableHttp.js"),
+    ]);
+
   const app = express();
   app.use(express.json());
 
-  // CORS — allow any origin
-  app.use((_req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  // ─── Rate Limiter ─────────────────────────────────────────
+  // NOTE: This is an in-memory, per-process rate limiter. If you scale
+  // to multiple instances, each has its own map — a client could get
+  // RATE_LIMIT_MAX * N requests/min. Use Redis-based limiting for
+  // multi-instance deployments.
+  const RATE_LIMIT_WINDOW_MS = 60_000;
+  const RATE_LIMIT_MAX = 60;
+
+  interface RateLimitEntry {
+    count: number;
+    resetAt: number;
+  }
+
+  const rateLimitMap = new Map<string, RateLimitEntry>();
+
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitMap) {
+      if (now > entry.resetAt) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }, 5 * 60_000);
+
+  function rateLimitMiddleware(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void {
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+
+    let entry = rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+      rateLimitMap.set(ip, entry);
+    }
+
+    entry.count++;
+
+    res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT_MAX));
     res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type"
+      "X-RateLimit-Remaining",
+      String(Math.max(0, RATE_LIMIT_MAX - entry.count))
     );
+    res.setHeader(
+      "X-RateLimit-Reset",
+      String(Math.ceil(entry.resetAt / 1000))
+    );
+
+    if (entry.count > RATE_LIMIT_MAX) {
+      res.status(429).json({
+        error: "Rate limit exceeded. Please wait before making more requests.",
+        retry_after_seconds: Math.ceil((entry.resetAt - now) / 1000),
+      });
+      return;
+    }
+
+    next();
+  }
+
+  // ─── CORS ─────────────────────────────────────────────────
+  const allowedOrigin = process.env.CORS_ORIGIN || "*";
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+    res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     next();
   });
-  app.options("*", (_req, res) => res.sendStatus(204));
+  app.options("*", (_req: Request, res: Response) => res.sendStatus(204));
 
-  // ─── MCP endpoint ──────────────────────────────────────────
-  app.post("/mcp", rateLimitMiddleware, async (req, res) => {
+  // ─── MCP endpoint ─────────────────────────────────────────
+  // NOTE: In stateless mode (sessionIdGenerator: undefined), a new
+  // transport is created per request. server.connect() is called each
+  // time — this is the documented MCP SDK pattern for stateless HTTP.
+  // For high-concurrency production use, consider session-based transport.
+  app.post("/mcp", rateLimitMiddleware, async (req: Request, res: Response) => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -448,20 +470,20 @@ async function runHTTP(): Promise<void> {
     await transport.handleRequest(req, res, req.body);
   });
 
-  // ─── Health check ──────────────────────────────────────────
-  app.get("/health", (_req, res) => {
+  // ─── Health check ─────────────────────────────────────────
+  app.get("/health", (_req: Request, res: Response) => {
     res.json({
       status: "ok",
       server: "bc-curriculum-mcp-server",
-      version: "1.1.0",
+      version: VERSION,
     });
   });
 
-  // ─── Documentation endpoint ─────────────────────────────────
-  app.get("/docs", (_req, res) => {
+  // ─── Documentation endpoint ───────────────────────────────
+  app.get("/docs", (_req: Request, res: Response) => {
     res.json({
       name: "BC Curriculum MCP Server",
-      version: "1.1.0",
+      version: VERSION,
       author: "Paul de Groot — Vancouver, BC",
       description:
         "Provides structured access to the entire BC Ministry of Education K–12 curriculum via MCP. " +
@@ -508,7 +530,8 @@ async function runHTTP(): Promise<void> {
         },
         {
           name: "bc_get_grade_progression",
-          description: "Trace how curriculum builds across grade levels, optionally focused on a specific concept",
+          description:
+            "Trace how curriculum builds across grade levels, optionally focused on a specific concept",
         },
         {
           name: "bc_get_competency_connections",
@@ -533,7 +556,8 @@ async function runHTTP(): Promise<void> {
         },
         {
           name: "bc_search_cross_curricular",
-          description: "Find curriculum connections shared between two or more subjects at a grade",
+          description:
+            "Find curriculum connections shared between two or more subjects at a grade",
         },
         {
           name: "bc_get_curriculum_changes",
