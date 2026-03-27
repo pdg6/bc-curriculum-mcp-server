@@ -201,6 +201,7 @@ function delay(ms: number): Promise<void> {
 async function safeNavigate(
   page: Page,
   url: string,
+  db: ReturnType<typeof getDb>,
   retries = 3
 ): Promise<boolean> {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -218,7 +219,7 @@ async function safeNavigate(
         `  [attempt ${attempt}/${retries}] Failed to load ${url}: ${message}`
       );
       if (attempt === retries) {
-        logCrawl(getDb(), url, null, null, message);
+        logCrawl(db, url, null, null, message);
         return false;
       }
       await delay(2000 * attempt);
@@ -259,7 +260,7 @@ async function crawlCoursePage(
 
   console.log(`  Crawling: ${courseName} Grade ${gradeLabel(grade)} (${courseUrl})`);
 
-  const success = await safeNavigate(page, courseUrl);
+  const success = await safeNavigate(page, courseUrl, db);
   if (!success) {
     console.error(`  FAILED: Could not load ${courseUrl}`);
     return;
@@ -420,7 +421,7 @@ async function crawlSubjectCore(
 
   // Crawl introduction page
   const introUrl = `${BC_CURRICULUM_BASE_URL}/curriculum/${subjectSlug}/introduction`;
-  if (await safeNavigate(page, introUrl)) {
+  if (await safeNavigate(page, introUrl, db)) {
     introduction = await extractIntroductionText(page);
     logCrawl(db, introUrl, 200, null, null);
     console.log(`  Introduction: ${introduction.length} chars`);
@@ -430,14 +431,14 @@ async function crawlSubjectCore(
 
   // Crawl goal and rationale page
   const goalUrl = `${BC_CURRICULUM_BASE_URL}/curriculum/${subjectSlug}/goals-and-rationale`;
-  if (await safeNavigate(page, goalUrl)) {
+  if (await safeNavigate(page, goalUrl, db)) {
     goalAndRationale = await extractIntroductionText(page);
     logCrawl(db, goalUrl, 200, null, null);
     console.log(`  Goal/Rationale: ${goalAndRationale.length} chars`);
   } else {
     // Try alternate URL pattern
     const altGoalUrl = `${BC_CURRICULUM_BASE_URL}/curriculum/${subjectSlug}/core/goal-and-rationale`;
-    if (await safeNavigate(page, altGoalUrl)) {
+    if (await safeNavigate(page, altGoalUrl, db)) {
       goalAndRationale = await extractIntroductionText(page);
       logCrawl(db, altGoalUrl, 200, null, null);
       console.log(`  Goal/Rationale (alt): ${goalAndRationale.length} chars`);
@@ -465,6 +466,8 @@ async function crawlSubjectCourses(
   subjectSlug: string,
   options: CrawlOptions
 ): Promise<void> {
+  const db = getDb();
+
   for (let grade = options.gradeFrom; grade <= options.gradeTo; grade++) {
     console.log(`\n  Grade ${gradeLabel(grade)}:`);
 
@@ -479,7 +482,7 @@ async function crawlSubjectCourses(
     // Languages never uses /core — always discover from /courses page
     if (subjectSlug === "languages" && grade <= CORE_ONLY_GRADES_MAX) {
       const coursesUrl = `${BC_CURRICULUM_BASE_URL}/curriculum/${subjectSlug}/${gradeSlug}/courses`;
-      if (await safeNavigate(page, coursesUrl)) {
+      if (await safeNavigate(page, coursesUrl, db)) {
         const courseLinks = await extractCourseLinks(page, BC_CURRICULUM_BASE_URL);
         if (courseLinks.length > 0) {
           console.log(`    Found ${courseLinks.length} language courses`);
@@ -558,7 +561,7 @@ async function crawlSubjectCourses(
       } else {
         // For other subjects, discover courses from the grade's /courses page
         const gradeUrl = `${BC_CURRICULUM_BASE_URL}/curriculum/${subjectSlug}/${gradeSlug}/courses`;
-        if (await safeNavigate(page, gradeUrl)) {
+        if (await safeNavigate(page, gradeUrl, db)) {
           const courseLinks = await extractCourseLinks(
             page,
             BC_CURRICULUM_BASE_URL
@@ -631,7 +634,7 @@ async function crawlCoreCompetencies(
     const url = `${BC_CURRICULUM_BASE_URL}${path}`;
     console.log(`  ${domain}: ${url}`);
 
-    if (await safeNavigate(page, url)) {
+    if (await safeNavigate(page, url, db)) {
       const competencies = await extractCoreCompetencies(page, domain);
       console.log(`    Found ${competencies.length} sub-competencies`);
 
@@ -664,7 +667,7 @@ async function crawlFppl(page: Page, options: CrawlOptions): Promise<void> {
   const url = `${BC_CURRICULUM_BASE_URL}${REFERENCE_PAGES.indigenousResources}`;
   console.log(`  URL: ${url}`);
 
-  if (await safeNavigate(page, url)) {
+  if (await safeNavigate(page, url, db)) {
     const principles = await extractFpplPrinciples(page);
     console.log(`  Found ${principles.length} principles`);
 
@@ -689,7 +692,7 @@ async function crawlAssessmentResources(
   const url = `${BC_CURRICULUM_BASE_URL}${REFERENCE_PAGES.classroomAssessment}`;
   console.log(`  URL: ${url}`);
 
-  if (await safeNavigate(page, url)) {
+  if (await safeNavigate(page, url, db)) {
     const resources = await extractAssessmentResources(page);
     console.log(`  Found ${resources.length} resources`);
 
@@ -722,7 +725,7 @@ async function crawlInstructionalSamples(
   const url = `${BC_CURRICULUM_BASE_URL}${REFERENCE_PAGES.instructionalSamples}`;
   console.log(`  URL: ${url}`);
 
-  if (await safeNavigate(page, url)) {
+  if (await safeNavigate(page, url, db)) {
     const samples = await extractInstructionalSamples(
       page,
       BC_CURRICULUM_BASE_URL
@@ -786,7 +789,7 @@ export async function runCrawl(
     });
     const context = await browser.newContext({
       userAgent:
-        "Mozilla/5.0 (compatible; BCCurriculumBot/1.0; +https://github.com/your-repo)",
+        "Mozilla/5.0 (compatible; BCCurriculumBot/1.0; +https://github.com/pdg6/bc-curriculum-mcp-server)",
     });
     const page = await context.newPage();
 

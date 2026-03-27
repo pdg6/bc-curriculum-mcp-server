@@ -42,9 +42,6 @@
     "crawl": "node dist/crawler/run-crawl.js",
     "crawl:adst": "node dist/crawler/run-crawl.js --subject adst",
     "crawl:all": "node dist/crawler/run-crawl.js --all",
-    "crawl:deploy": "bash scripts/crawl-and-deploy.sh",
-    "crawl:deploy:force": "bash scripts/crawl-and-deploy.sh --force",
-    "crawl:report": "node scripts/crawl-report.cjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -55,13 +52,13 @@
     "@modelcontextprotocol/sdk": "^1.6.1",
     "better-sqlite3": "^11.7.0",
     "express": "^4.21.0",
-    "playwright": "^1.49.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
+    "playwright": "^1.49.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^4.1.2"

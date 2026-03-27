@@ -9,14 +9,36 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 
 let db: Database.Database | null = null;
 
-/** Get or create the database connection */
+/**
+ * Get or create the database connection.
+ *
+ * DB path resolution order:
+ *   1. DB_PATH env var (explicit override)
+ *   2. ./bc-curriculum.sqlite in cwd (backward compatibility)
+ *   3. ~/.bc-curriculum/bc-curriculum.sqlite (stable default)
+ */
 export function getDb(): Database.Database {
   if (db) return db;
-  const dbPath =
-    process.env.DB_PATH || path.join(process.cwd(), "bc-curriculum.sqlite");
+
+  let dbPath = process.env.DB_PATH;
+  if (!dbPath) {
+    const cwdPath = path.join(process.cwd(), "bc-curriculum.sqlite");
+    if (existsSync(cwdPath)) {
+      dbPath = cwdPath;
+    } else {
+      const dataDir = path.join(homedir(), ".bc-curriculum");
+      if (!existsSync(dataDir)) {
+        mkdirSync(dataDir, { recursive: true });
+      }
+      dbPath = path.join(dataDir, "bc-curriculum.sqlite");
+    }
+  }
+
   db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
@@ -246,8 +268,8 @@ function initializeSchema(database: Database.Database): void {
       c3.grade AS next_grade,
       c3.name AS next_name
     FROM courses c1
-    LEFT JOIN courses c2 ON c1.subject_id = c2.subject_id AND c2.grade = c1.grade - 1
-    LEFT JOIN courses c3 ON c1.subject_id = c3.subject_id AND c3.grade = c1.grade + 1;
+    LEFT JOIN courses c2 ON c1.subject_id = c2.subject_id AND c2.grade = c1.grade - 1 AND c2.slug = c1.slug
+    LEFT JOIN courses c3 ON c1.subject_id = c3.subject_id AND c3.grade = c1.grade + 1 AND c3.slug = c1.slug;
   `);
 }
 
@@ -671,20 +693,29 @@ export function insertChangelogEntry(
     .run(courseId, sourceType, changeType, oldText, newText, oldHash, newHash);
 }
 
+/**
+ * Clear all curriculum data for a course.
+ *
+ * Wrapped in a transaction for atomicity — safe to call standalone or
+ * within an outer transaction (better-sqlite3 uses SAVEPOINTs for nesting).
+ */
 export function clearCourseData(
   database: Database.Database,
   courseId: string
 ): void {
-  database.prepare("DELETE FROM big_ideas WHERE course_id = ?").run(courseId);
-  database
-    .prepare("DELETE FROM curricular_competencies WHERE course_id = ?")
-    .run(courseId);
-  database
-    .prepare("DELETE FROM content_items WHERE course_id = ?")
-    .run(courseId);
-  database
-    .prepare("DELETE FROM curriculum_fts WHERE course_id = ?")
-    .run(courseId);
+  const clear = database.transaction(() => {
+    database.prepare("DELETE FROM big_ideas WHERE course_id = ?").run(courseId);
+    database
+      .prepare("DELETE FROM curricular_competencies WHERE course_id = ?")
+      .run(courseId);
+    database
+      .prepare("DELETE FROM content_items WHERE course_id = ?")
+      .run(courseId);
+    database
+      .prepare("DELETE FROM curriculum_fts WHERE course_id = ?")
+      .run(courseId);
+  });
+  clear();
 }
 
 export function clearReferenceData(database: Database.Database): void {
