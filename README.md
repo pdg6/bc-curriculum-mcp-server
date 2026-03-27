@@ -1,12 +1,12 @@
 # BC Curriculum MCP Server
 
-An MCP (Model Context Protocol) server that gives BC teachers structured access to the entire BC Ministry of Education K–12 curriculum through Claude. Connect with one line of config — no installs, no accounts, no technical setup.
+An MCP (Model Context Protocol) server that gives BC teachers structured access to the entire BC Ministry of Education K–12 curriculum. Connect with one line of config — no installs, no accounts, no technical setup.
 
 **Author:** Paul de Groot — Vancouver, BC
 
 ## What It Does
 
-This server crawls [curriculum.gov.bc.ca](https://curriculum.gov.bc.ca/curriculum) and makes the full BC K–12 curriculum queryable through 12 MCP tools. Teachers and curriculum designers can ask Claude natural-language questions about Big Ideas, Curricular Competencies, Content standards, grade progressions, cross-subject connections, and more — grounded in the actual published curriculum data.
+This server crawls [curriculum.gov.bc.ca](https://curriculum.gov.bc.ca/curriculum) and makes the full BC K–12 curriculum queryable through 12 MCP tools. Teachers and curriculum designers can ask natural-language questions about Big Ideas, Curricular Competencies, Content standards, grade progressions, cross-subject connections, and more — grounded in the actual published curriculum data.
 
 ### Data Coverage
 
@@ -22,7 +22,7 @@ This server crawls [curriculum.gov.bc.ca](https://curriculum.gov.bc.ca/curriculu
 
 ### Option 1: Remote server (no install needed)
 
-Add this to your MCP config (Claude Desktop → Settings → MCP Servers → Add):
+Add this to your MCP config:
 
 ```json
 {
@@ -56,7 +56,7 @@ npm install -g bc-curriculum-mcp-server
 bc-curriculum-mcp
 ```
 
-Once connected, ask Claude things like:
+Once connected, ask things like:
 
 - "What are the Big Ideas for ADST grade 10?"
 - "Show me how science competencies build from grade 3 to 7"
@@ -93,7 +93,7 @@ Once connected, ask Claude things like:
 └──────────────────────┘       └─────────────────────────┘
                                         │
                                         ▼
-                               Claude Desktop / Cowork
+                               Claude Desktop / Cowork / VS Codee / Antigravity
                                connects via MCP over HTTPS
 ```
 
