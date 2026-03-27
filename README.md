@@ -47,7 +47,7 @@ claude mcp add bc-curriculum --transport http --url https://bc-curriculum-mcp.fl
 npx bc-curriculum-mcp-server
 ```
 
-This runs the server in stdio mode — compatible with any MCP client. You'll need a local `bc-curriculum.sqlite` database (see [For Developers](#for-developers) below).
+This runs the server in stdio mode — compatible with any MCP client. You'll need a local `bc-curriculum.sqlite` database (clone the repo, install Playwright, and run the crawler — see [For Developers](#for-developers) below).
 
 ### Option 3: Install globally via npm
 
@@ -109,7 +109,7 @@ The crawler runs locally using Playwright + headless Chromium to render the Java
 ### Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/pdg6/bc-curriculum-mcp-server.git
 cd bc-curriculum-mcp-server
 npm install
 npx playwright install chromium
@@ -138,10 +138,6 @@ npm start
 # HTTP transport (for remote connections)
 TRANSPORT=http npm start
 ```
-
-### Deploy
-
-See [DEPLOY.md](./DEPLOY.md) for full Fly.io deployment instructions.
 
 ## How It Works
 
