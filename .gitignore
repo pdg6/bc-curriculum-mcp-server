@@ -1,5 +1,21 @@
 node_modules/
 dist/
+
+# Database files
 *.sqlite
-.mcpregistry_github_token
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite.backup-*
+
+# Crawl logs
+crawl-*.log
+
+# MCP registry auth tokens and publisher binary
+.mcpregistry_*
 mcp-publisher.exe
+
+# OS/editor junk
+.fuse_hidden*
+.DS_Store
+Thumbs.db
+*.swp
