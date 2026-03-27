@@ -1,6 +1,6 @@
 {
   "name": "bc-curriculum-mcp-server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "MCP server providing structured access to BC Ministry of Education curriculum data (curriculum.gov.bc.ca)",
   "license": "MIT",
   "author": "Paul de Groot",
