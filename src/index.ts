@@ -449,25 +449,72 @@ async function runHTTP(): Promise<void> {
   const allowedOrigin = process.env.CORS_ORIGIN || "*";
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-    res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "POST, GET, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     next();
   });
   app.options("*", (_req: Request, res: Response) => res.sendStatus(204));
 
+  // ─── Accept header normalization ────────────────────────
+  // The MCP SDK strictly requires Accept: application/json, text/event-stream
+  // on every POST, even for simple request/response methods like initialize
+  // and tools/list. Some clients (including Claude Code) don't send
+  // text/event-stream, causing a 406 rejection before any tools load.
+  // This middleware normalizes the header so the SDK check passes.
+  app.use("/mcp", (req: Request, _res: Response, next: NextFunction) => {
+    if (req.method === "POST") {
+      const accept = req.headers.accept || "";
+      if (!accept.includes("text/event-stream")) {
+        req.headers.accept = accept
+          ? `${accept}, text/event-stream`
+          : "application/json, text/event-stream";
+      }
+      if (!accept.includes("application/json")) {
+        req.headers.accept = `application/json, ${req.headers.accept}`;
+      }
+    }
+    next();
+  });
+
   // ─── MCP endpoint ─────────────────────────────────────────
-  // NOTE: In stateless mode (sessionIdGenerator: undefined), a new
-  // transport is created per request. server.connect() is called each
-  // time — this is the documented MCP SDK pattern for stateless HTTP.
-  // For high-concurrency production use, consider session-based transport.
+  // In stateless mode (sessionIdGenerator: undefined), a new transport
+  // is created per request. server.connect() is called each time — this
+  // is the documented MCP SDK pattern for stateless HTTP.
   app.post("/mcp", rateLimitMiddleware, async (req: Request, res: Response) => {
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
+    try {
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      res.on("close", () => transport.close());
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (err) {
+      console.error("MCP request error:", err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        });
+      }
+    }
+  });
+
+  // Some MCP clients probe with GET (for SSE long-polling) or send
+  // DELETE (for session cleanup). Handle both gracefully.
+  app.get("/mcp", (_req: Request, res: Response) => {
+    res.status(405).json({
+      error: "Method Not Allowed",
+      hint: "Use POST for MCP Streamable HTTP requests",
+      server: "bc-curriculum-mcp-server",
+      version: VERSION,
     });
-    res.on("close", () => transport.close());
-    await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+  });
+
+  app.delete("/mcp", (_req: Request, res: Response) => {
+    // Stateless mode — no sessions to clean up
+    res.sendStatus(200);
   });
 
   // ─── Health check ─────────────────────────────────────────
