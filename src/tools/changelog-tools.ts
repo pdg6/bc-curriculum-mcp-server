@@ -184,7 +184,7 @@ export function getCourseHistory(params: GetCourseHistoryInput): {
       content: [
         {
           type: "text",
-          text: `No courses found for ${params.subject} grade ${formatGrade(params.grade)}${courseHint}. Use bc_list_courses to see available courses.`,
+          text: `No courses found for ${params.subject} grade ${formatGrade(params.grade)}${courseHint}. Use list_courses to see available courses.`,
         },
       ],
       structuredContent: { courses: [] },
